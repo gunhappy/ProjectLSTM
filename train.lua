@@ -40,7 +40,7 @@ cmd:option('-data_dir','data/tinyshakespeare','data directory. Should contain th
 cmd:option('-task', 'char', 'task to train on: char, addition')
 cmd:option('-digit_length', 4, 'length of the digits to add for the addition task')
 -- model params
-cmd:option('-rnn_size', 128, 'size of LSTM internal state')
+cmd:option('-rnn_size', 13400, 'size of LSTM internal state')
 cmd:option('-num_layers', 2, 'number of layers in the LSTM')
 cmd:option('-model', 'lstm', 'lstm, grid_lstm, gru, or rnn')
 cmd:option('-tie_weights', 1, 'tie grid lstm weights?')
