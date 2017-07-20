@@ -131,6 +131,7 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
     local rawdata
     local tot_len = 0
     local f = assert(io.open(in_textfile, "r"))
+    local word_len = 0
 
     -- create vocabulary if it doesn't exist yet
     print('creating vocabulary mapping...')
@@ -142,6 +143,7 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
         for word in rawdata:gmatch'%w+' do
             if not unordered[word] then unordered[word] = true end
             i = i+1
+            word_len = word_len + 1
         end
         tot_len = tot_len + #rawdata
         rawdata = f:read(cache_len)
@@ -161,7 +163,7 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
 
     -- construct a tensor with all the data
     print('putting data into tensor...')
-    local data = torch.ByteTensor(tot_len) -- store it into 1D first, then rearrange
+    local data = torch.DoubleTensor(word_len) -- store it into 1D first, then rearrange
     f = assert(io.open(in_textfile, "r"))
     local currlen = 0
     rawdata = f:read(cache_len)
@@ -174,12 +176,12 @@ function CharSplitLMMinibatchLoader.text_to_tensor(in_textfile, out_vocabfile, o
         rawdata = f:read(cache_len)
     until not rawdata
     f:close()
-
+    -- print(data)
     -- save output preprocessed files
-  --  print('saving ' .. out_vocabfile)
-   torch.save(out_vocabfile, vocab_mapping)
-  --  print('saving ' .. out_tensorfile)
-   torch.save(out_tensorfile, data)
+    print('saving ' .. out_vocabfile)
+    torch.save(out_vocabfile, vocab_mapping)
+    print('saving ' .. out_tensorfile)
+    torch.save(out_tensorfile, data)
 end
 
 return CharSplitLMMinibatchLoader

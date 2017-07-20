@@ -40,9 +40,9 @@ cmd:option('-data_dir','data/tinyshakespeare','data directory. Should contain th
 cmd:option('-task', 'char', 'task to train on: char, addition')
 cmd:option('-digit_length', 4, 'length of the digits to add for the addition task')
 -- model params
-cmd:option('-rnn_size', 13400, 'size of LSTM internal state')
+cmd:option('-rnn_size', 128, 'size of LSTM internal state')
 cmd:option('-num_layers', 2, 'number of layers in the LSTM')
-cmd:option('-model', 'lstm', 'lstm, grid_lstm, gru, or rnn')
+cmd:option('-model', 'grid_lstm', 'lstm, grid_lstm, gru, or rnn')
 cmd:option('-tie_weights', 1, 'tie grid lstm weights?')
 -- optimization
 cmd:option('-learning_rate',2e-3,'learning rate')
@@ -66,7 +66,7 @@ cmd:option('-checkpoint_dir', 'cv', 'output directory where checkpoints get writ
 cmd:option('-savefile','lstm','filename to autosave the checkpont to. Will be inside checkpoint_dir/')
 cmd:option('-accurate_gpu_timing',0,'set this flag to 1 to get precise timings when using GPU. Might make code bit slower but reports accurate timings.')
 -- GPU/CPU
-cmd:option('-gpuid',0,'which gpu to use. -1 = use CPU')
+cmd:option('-gpuid',-1,'which gpu to use. -1 = use CPU')
 cmd:option('-opencl',0,'use OpenCL (instead of CUDA)')
 cmd:text()
 
@@ -223,14 +223,17 @@ function prepro(x,y)
         x = x:cl()
         y = y:cl()
     end
+
     return x,y
 end
 
 function get_input_mem_cell()
     local input_mem_cell = torch.zeros(opt.batch_size, opt.rnn_size)
+
     if opt.gpuid >= 0 and opt.opencl == 0 then
       input_mem_cell = input_mem_cell:float():cuda()
     end
+
     return input_mem_cell
 end
 
@@ -311,6 +314,7 @@ function feval(x)
     local rnn_state = {[0] = init_state_global}
     local predictions = {}           -- softmax outputs
     local loss = 0
+
     for t=1,opt.seq_length do
         clones.rnn[t]:training() -- make sure we are in correct mode (this is cheap, sets flag)
         local rnn_inputs

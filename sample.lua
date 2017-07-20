@@ -30,7 +30,7 @@ cmd:option('-sample',1,' 0 to use max at each timestep, 1 to sample at each time
 cmd:option('-primetext',"",'used as a prompt to "seed" the state of the LSTM using a given sequence, before we sample.')
 cmd:option('-length',2000,'number of characters to sample')
 cmd:option('-temperature',1,'temperature of sampling')
-cmd:option('-gpuid',0,'which gpu to use. -1 = use CPU')
+cmd:option('-gpuid',-1,'which gpu to use. -1 = use CPU')
 cmd:option('-opencl',0,'use OpenCL (instead of CUDA)')
 cmd:option('-verbose',1,'set to 0 to ONLY print the sampled text, no diagnostics')
 cmd:text()
@@ -121,16 +121,16 @@ local seed_text = opt.primetext
 if string.len(seed_text) > 0 then
     gprint('seeding with ' .. seed_text)
     gprint('--------------------------')
-    for c in seed_text:gmatch'.' do
-        prev_char = torch.Tensor{vocab[c]}
-        io.write(ivocab[prev_char[1]])
-        if opt.gpuid >= 0 and opt.opencl == 0 then prev_char = prev_char:cuda() end
-        if opt.gpuid >= 0 and opt.opencl == 1 then prev_char = prev_char:cl() end
+    for w in seed_text:gmatch'%w+' do
+        prev_word = torch.Tensor{vocab[w]}
+        io.write(ivocab[prev_word[1]].." ")
+        if opt.gpuid >= 0 and opt.opencl == 0 then prev_word = prev_word:cuda() end
+        if opt.gpuid >= 0 and opt.opencl == 1 then prev_word = prev_word:cl() end
         if checkpoint.opt.model == "grid_lstm" then
           local input_mem_cell = get_input_mem_cell()
-          rnn_inputs = {input_mem_cell, prev_char, unpack(current_state)} -- if we're using a grid lstm, hand in a zero vec for the starting memory cell state
+          rnn_inputs = {input_mem_cell, prev_word, unpack(current_state)} -- if we're using a grid lstm, hand in a zero vec for the starting memory cell state
         else
-          rnn_inputs = {prev_char, unpack(current_state)}
+          rnn_inputs = {prev_word, unpack(current_state)}
         end
         local lst = protos.rnn:forward(rnn_inputs)
         -- lst is a list of [state1,state2,..stateN,output]. We want everything but last piece
@@ -138,6 +138,7 @@ if string.len(seed_text) > 0 then
         for i=1,state_size do table.insert(current_state, lst[i]) end
         prediction = lst[#lst] -- last element holds the log probabilities
     end
+
 else
     -- fill with uniform probabilities over characters (? hmm)
     gprint('missing seed text, using uniform probability over first character')
@@ -153,28 +154,28 @@ for i=1, opt.length do
     -- log probabilities from the previous timestep
     if opt.sample == 0 then
         -- use argmax
-        local _, prev_char_ = prediction:max(2)
-        prev_char = prev_char_:resize(1)
+        local _, prev_word_ = prediction:max(2)
+        prev_word = prev_word_:resize(1)
     else
         -- use sampling
         prediction:div(opt.temperature) -- scale by temperature
         local probs = torch.exp(prediction):squeeze()
         probs:div(torch.sum(probs)) -- renormalize so probs sum to one
-        prev_char = torch.multinomial(probs:float(), 1):resize(1):float()
+        prev_word = torch.multinomial(probs:float(), 1):resize(1):float()
     end
 
     -- forward the rnn for next character
     if checkpoint.opt.model == "grid_lstm" then
       local input_mem_cell = get_input_mem_cell()
-      rnn_inputs = {input_mem_cell, prev_char, unpack(current_state)} -- if we're using a grid lstm, hand in a zero vec for the starting memory cell state
+      rnn_inputs = {input_mem_cell, prev_word, unpack(current_state)} -- if we're using a grid lstm, hand in a zero vec for the starting memory cell state
     else
-      rnn_inputs = {prev_char, unpack(current_state)}
+      rnn_inputs = {prev_word, unpack(current_state)}
     end
     local lst = protos.rnn:forward(rnn_inputs)
     current_state = {}
     for i=1,state_size do table.insert(current_state, lst[i]) end
     prediction = lst[#lst] -- last element holds the log probabilities
 
-    io.write(ivocab[prev_char[1]])
+    io.write(ivocab[prev_word[1]].." ")
 end
 io.write('\n') io.flush()
